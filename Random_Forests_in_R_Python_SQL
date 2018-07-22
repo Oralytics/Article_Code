@@ -1,0 +1,167 @@
+# This file contains R, Python and SQL code
+# It illustrates how to create and use Random Forests in all 3 languages
+
+########################################
+############ R code example ############
+########################################
+# Demo code for illustrating Random Forests
+
+# open RandomForest library
+library(randomForest)
+
+# load the data set from CSV file
+BankData <- read.csv(file="/Users/brendan.tierney/Downloads/bank-additional/bank-additional-full.csv", header=TRUE, sep=";")
+# Let us investage this dataset and gather some informations and statistics
+head(BankData)
+ncol(BankData)
+nrow(BankData)
+names(BankData)
+str(BankData)
+dim(BankData)
+summary(BankData)
+
+# Set the sample size to be 40% of the full data set 
+#    The Testing data set will have 30% of the records 
+#    The Training data set will have 70% of the records 
+SampleSize <- nrow(BankData)*0.30
+
+# Create an index of records for the Sample 
+Index_Sample <- sample(1:nrow(BankData), SampleSize) 
+group <- as.integer(1:nrow(BankData) %in% Index_Sample) 
+
+# Create a partitioned data set of those records not selected to be in sample 
+Training_Sample <- BankData[group==FALSE,] 
+# Get the number of records in the Training Sample data set 
+nrow(Training_Sample) 
+
+# Create a partitioned data set of those records who were selected to be in the sample 
+Testing_Sample <- BankData[group==TRUE,] 
+# Get the number of records in the Testing Sample data set 
+nrow(Testing_Sample)
+
+# The read.csv function converted all string and categorical variables to factors
+# need to check if any numeric variables should be converted to factors
+
+
+# set the random seed
+# set.seed(42)
+
+# generate/fit the model with 50 trees
+rf_model <- randomForest(y~., data=Training_Sample, ntree=50)
+
+# print basic model details, including confusion matrix
+rf_model
+names(rf_model)
+rf_model$call
+rf_model$type
+rf_model$terms
+rf_model$ntree
+rf_model$mtry
+rf_model$classes
+rf_model$DOP
+rf_model$confusion
+rf_model$RFOPKG
+summary(rf_model)
+
+#Evaluate variable importance
+importance(rf_model)
+varImpPlot(rf_model) 
+# Higher the value of mean decrease accuracy or mean decrease gini score, 
+#  higher the importance of the variable in the model. In the plot shown 
+#  above, Account Balance is most important variable.
+
+
+# Score/label new data set = Testing Data set
+RF_scored <- predict(rf_model, newdata=Testing_Sample, type="response")
+# add the predicted value to the dataset
+RF_scored2 <- cbind(Testing_Sample, RF_scored)
+# create cross tab table on actual values vs predicted values i.e. confusion matrix
+table(RF_scored2$y, RF_scored2$RF_scored)
+
+# Generate the probabilities for the predicted values
+RF_prob <- predict(rf_model, newdata=Testing_Sample, type="prob")
+# Add probability scores to the dataset
+RF_scored4 <- cbind(RF_scored2, RF_prob)
+head(RF_scored4)
+tail(RF_scored4)
+
+# Let us now generate the ROC chart for the Test dataset
+library(ROCR)
+
+# generate the probabilities scores
+rf.pr = predict(rf_model, type="prob", newdata=Testing_Sample)[,2]
+
+# use the ROCR prediction function
+RF_pred <- prediction(rf.pr, Testing_Sample$y) 
+
+# performance in terms of true and false positive rates
+RF_scored_perf <- performance(RF_pred, "tpr", "fpr")
+
+#plot the ROC chart
+plot(RF_scored_perf, main="ROC Curve for Random Forest", col=2, lwd=2)
+abline(a=0, b=1, lwd=2, lty=2, col="gray")
+
+#compute area under curve
+auc <- performance(RF_pred,"auc")
+auc <- unlist(slot(auc, "y.values"))
+
+minauc<-min(round(auc, digits = 2))
+maxauc<-max(round(auc, digits = 2))
+minauct <- paste(c("min(AUC) = "),minauc,sep="")
+maxauct <- paste(c("max(AUC) = "),maxauc,sep="")
+minauct
+maxauct
+
+
+########################################
+######### Python code example ##########
+########################################
+
+
+
+
+
+
+
+########################################
+########### SQL code example ###########
+########################################
+create or replace view bank_train_v
+as select * from banking_additional
+where ora_hash(cust_id,99) <= 70;
+
+create or replace view bank_test_v
+as select * from banking_additional
+where ora_hash(cust_id,99) > 70;
+
+-- create the settings table for a Random Forest model
+CREATE TABLE demo_RF_settings 
+( setting_name  VARCHAR2(30),
+  setting_value VARCHAR2(4000));
+
+-- insert the settings records for a Neural Network
+-- ADP is turned on. By default ADP is turned off.
+BEGIN
+  INSERT INTO demo_RF_settings (setting_name, setting_value)
+  values (dbms_data_mining.algo_name, 
+          dbms_data_mining.algo_random_forest);
+	
+  INSERT INTO demo_neural_network_settings (setting_name, setting_value)
+  VALUES (dbms_data_mining.prep_auto, dbms_data_mining.prep_auto_on);
+END;
+
+BEGIN
+   DBMS_DATA_MINING.CREATE_MODEL(
+      model_name          => 'DEMO_RF_MODEL',
+      mining_function     => dbms_data_mining.classification,
+      data_table_name     => 'bank_train_v',
+      case_id_column_name => 'cust_id',
+      target_column_name  => 'target',
+      settings_table_name => 'demo_rf_settings');
+END;
+
+SELECT cust_id, target,
+       prediction(DEMO_RF_MODEL USING *)  predicted_value,
+       prediction_probability(DEMO_RF_MODEL USING *) probability
+FROM   bank_test_v;
+
