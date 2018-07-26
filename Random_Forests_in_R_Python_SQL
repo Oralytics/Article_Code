@@ -116,10 +116,141 @@ maxauct
 ########################################
 ######### Python code example ##########
 ########################################
+pip3 install -U scikit-learn
+pip3 install -U numpy
+pip3 install -U scipy
+pip3 install -U matplotlib
+pip3 install -U pandas
 
+# read the data set into the panda
+import pandas as pd
 
+Bank_df = pd.read_csv('/users/brendan.tierney/Downloads/bank-additional/bank-additional-full.csv', sep=";")
 
+# display the data
+Bank_df
 
+# explore the data
+Bank_df.info()
+
+# gather basic statistics about each column. 
+#  very like summary function in R
+Bank_df.describe()
+
+# number of rows and columns
+Bank_df.shape
+
+# list the column names
+Bank_df.columns
+
+# recode reponse variable into 1/0
+
+Bank_df2 = Bank_df
+Bank_df2['TARGET'] = pd.factorize(Bank_df2['y'])[0]
+
+# remove the 'y' column
+Bank_df2 = Bank_df2.drop('y', 1)
+
+# Perform one-hot encoding for categorical features. 
+# These are   job, marital, education, default, housing, load, contact, month, day_of_week, poutcome
+
+# One-hot encode the data using pandas get_dummies
+Bank_df3 = pd.get_dummies(Bank_df2, dummy_na=True)
+Bank_df3.columns
+
+# check out alternative training/test split method with scikitLearn
+from sklearn.model_selection import train_test_split
+
+training_sample2, testing_sample2 = train_test_split(Bank_df3, test_size=0.3, random_state=42)
+
+print("Training data set size = ", len(training_sample2))
+print("Testing data set size = ", len(testing_sample2))
+
+# list the attributes needed for inputs
+
+# Labels are the values we want to predict i.e. target variable
+train_labels = np.array(training_sample2['TARGET'])
+
+# remove the target variable from the data set. axis=1 means drop column
+train_features = training_sample2.drop('TARGET', axis=1)
+training_sample2 = train_features
+
+# Saving feature names for later use
+train_feature_list = list(train_features.columns)
+
+# Convert to numpy array
+train_features = np.array(train_features)
+
+# setup Random Forest algorithm
+# Import the model we are using
+#from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
+
+# Instantiate model with 50 decision trees
+rf = RandomForestClassifier(n_estimators = 50, random_state = 42)
+
+# create or fit the model
+# train the model on training sample data set
+rf.fit(train_features, train_labels);
+
+# list decision trees estimators
+print(rf.estimators_)
+print('--------------------')
+print('Num of classes')
+print(rf.n_classes_)
+print('--------------------')
+print('Class labels')
+print(rf.classes_)
+print('--------------------')
+print('Num of features when fit is perform')
+print(rf.n_features_)
+print('--------------------')
+print('Num of outputs when fit is performed')
+print(rf.n_outputs_)
+print('--------------------')
+print('Feature Importance')
+print(rf.feature_importances_)
+
+from sklearn.model_selection import cross_validate
+
+accuracy = cross_validate(rf, test_features, test_labels, cv=10)['test_score']
+print('The accuracy is: ',sum(accuracy)/len(accuracy)*100,'%')
+
+The accuracy is:  91.00104692394183 %
+
+# plot ROC chart
+plt.title('Receiver Operating Characteristic')
+plt.plot(false_positive_rate, true_positive_rate, 'b',
+label='AUC = %0.2f'% roc_auc)
+plt.legend(loc='lower right')
+plt.plot([0,1],[0,1],'r--')
+plt.xlim([-0.1,1.2])
+plt.ylim([-0.1,1.2])
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
+
+# Get numerical feature importances
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+importances = list(rf.feature_importances_)
+
+# Set the style
+plt.style.use('fivethirtyeight')
+plt.figure(figsize=(16,8))
+
+# list of x locations for plotting
+x_values = list(range(len(importances)))
+
+# Make a bar chart
+plt.bar(x_values, importances, orientation = 'vertical')
+
+# Tick labels for x axis
+plt.xticks(x_values, feature_list, rotation='vertical')
+
+# Axis labels and title
+plt.ylabel('Importance'); plt.xlabel('Variable'); plt.title('Variable Importances');
 
 
 
